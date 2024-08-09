@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sök på YouTube</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: rgb(156, 156, 156); 
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .search-box {
+            position: relative;
+            display: inline-block;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            font-size: 16px;
+            border: 2px solid darkgray;
+            border-radius: 4px;
+            width: 300px;
+            background-color: rgb(33, 33, 33);
+            color:rgb(167, 167, 167);
+            
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            background-color: rgb(33, 33, 33);
+            color:rgb(179, 178, 178);
+        }
+
+        .suggestions {
+            margin-top: 10px;
+            text-align: left;
+            max-width: 300px;
+            margin: 0 auto;
+            position: absolute;
+            background: black;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 100%;
+            z-index: 1000;
+            display: none;
+
+        }
+
+        .suggestions ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .suggestions li {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            cursor: pointer;
+            align-items: center;
+        }
+
+        .suggestions li:hover {
+            background: black;
+        }
+
+        .suggestions li .delete-btn {
+            color: #007bff;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .suggestions li.active {
+            background: rgb(39, 39, 39);
+            color: rgb(121, 121, 121);
+            border: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sök på YouTube</h1>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Skriv din sökning här...">
+            <div class="suggestions" id="suggestions"></div>
+        </div>
+        <p>Ahh, så skönt..</p>
+        <a href="https://www.youtube.com/feed/subscriptions">prenumerationer</a>
+    </div>
+
+    <script>
+        // Function to replace content if the URL is https://youtube.com/
+        function checkAndReplaceContent() {
+            if (window.location.href === 'https://www.youtube.com/') {
+                document.body.innerHTML = `
+                    <div style="text-align: center; padding: 50px;">
+                        <h1>Ny Innehåll</h1>
+                        <p>Detta är en ersättning för YouTube-startsidan.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize search functionality
+        function initSearchFunctionality() {
+            const searchInput = document.getElementById('search-input');
+            const suggestionsDiv = document.getElementById('suggestions');
+            let searchHistory = JSON.parse(localStorage.getItem('searchHistory')) || [];
+            let activeIndex = -1;
+
+            function updateSuggestions(query) {
+                suggestionsDiv.innerHTML = '';
+                const filteredHistory = searchHistory.filter(item => item.toLowerCase().includes(query)).slice(0, 10);
+
+                if (filteredHistory.length > 0) {
+                    const suggestionsList = document.createElement('ul');
+                    filteredHistory.forEach((item, index) => {
+                        const listItem = document.createElement('li');
+                        listItem.innerHTML = `
+                            <span class="search-term">${item}</span>
+                            <span class="delete-btn">X</span>
+                        `;
+                        listItem.addEventListener('click', () => {
+                            searchInput.value = item;
+                            suggestionsDiv.innerHTML = '';
+                            suggestionsDiv.style.display = 'none';
+                            window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(item)}`;
+                        });
+                        listItem.querySelector('.delete-btn').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            searchHistory = searchHistory.filter(term => term !== item);
+                            localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
+                            updateSuggestions(query);
+                        });
+                        suggestionsList.appendChild(listItem);
+                    });
+                    suggestionsDiv.appendChild(suggestionsList);
+                    suggestionsDiv.style.display = 'block';
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                }
+            }
+
+            searchInput.addEventListener('input', function() {
+                const query = searchInput.value.toLowerCase();
+                activeIndex = -1;
+                updateSuggestions(query);
+            });
+
+            searchInput.addEventListener('keydown', function(event) {
+                const items = suggestionsDiv.querySelectorAll('li');
+                if (event.key === 'Enter') {
+                    if (activeIndex >= 0 && items[activeIndex]) {
+                        const selectedTerm = items[activeIndex].querySelector('.search-term').textContent.trim();
+                        searchInput.value = selectedTerm;
+                        searchHistory.unshift(selectedTerm);
+                        // Cap total stored search terms to 1000 characters
+                        if (JSON.stringify(searchHistory).length > 1000) {
+                            while (JSON.stringify(searchHistory).length > 1000) {
+                                searchHistory.pop();
+                            }
+                        }
+                        localStorage.setItem('searchHistory', JSON.stringify([...new Set(searchHistory)]));
+                        suggestionsDiv.innerHTML = '';
+                        suggestionsDiv.style.display = 'none';
+                        window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(selectedTerm)}`;
+                    } else if (activeIndex === -1) {
+                        const query = searchInput.value.trim();
+                        if (query) {
+                            searchHistory.unshift(query);
+                            // Cap total stored search terms to 1000 characters
+                            if (JSON.stringify(searchHistory).length > 1000) {
+                                while (JSON.stringify(searchHistory).length > 1000) {
+                                    searchHistory.pop();
+                                }
+                            }
+                            localStorage.setItem('searchHistory', JSON.stringify([...new Set(searchHistory)]));
+                            suggestionsDiv.innerHTML = '';
+                            suggestionsDiv.style.display = 'none';
+                            window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+                        }
+                    }
+                } else if (event.key === 'ArrowDown') {
+                    if (items.length > 0) {
+                        if (activeIndex >= 0) items[activeIndex].classList.remove('active');
+                        activeIndex = (activeIndex + 1) % items.length;
+                        items[activeIndex].classList.add('active');
+                        searchInput.value = items[activeIndex].querySelector('.search-term').textContent.trim();
+                    }
+                } else if (event.key === 'ArrowUp') {
+                    if (items.length > 0) {
+                        if (activeIndex >= 0) items[activeIndex].classList.remove('active');
+                        activeIndex = (activeIndex - 1 + items.length) % items.length;
+                        items[activeIndex].classList.add('active');
+                        searchInput.value = items[activeIndex].querySelector('.search-term').textContent.trim();
+                    }
+                }
+            });
+        }
+
+        // Call the functions on page load
+        window.onload = function() {
+            checkAndReplaceContent();
+            initSearchFunctionality();
+        };
+    </script>
+</body>
+</html>
